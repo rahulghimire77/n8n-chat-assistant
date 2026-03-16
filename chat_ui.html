@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Webhook Chat</title>
+  <style>
+    :root {
+      --bg-1: #0f172a;
+      --bg-2: #122033;
+      --panel: rgba(15, 23, 42, 0.78);
+      --panel-strong: rgba(15, 23, 42, 0.92);
+      --surface: rgba(255, 255, 255, 0.04);
+      --surface-2: rgba(255, 255, 255, 0.08);
+      --border: rgba(148, 163, 184, 0.18);
+      --text: #e5eefc;
+      --muted: #94a3b8;
+      --accent: #14b8a6;
+      --assistant-bubble: rgba(255, 255, 255, 0.06);
+      --user-bubble: linear-gradient(135deg, #1d4ed8, #0f766e);
+      --shadow: 0 24px 80px rgba(2, 8, 23, 0.45);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at top left, rgba(20, 184, 166, 0.18), transparent 24%),
+        radial-gradient(circle at bottom right, rgba(29, 78, 216, 0.22), transparent 30%),
+        linear-gradient(160deg, var(--bg-1), var(--bg-2));
+      display: grid;
+      place-items: center;
+      padding: 24px;
+    }
+
+    .shell {
+      width: min(1100px, 100%);
+      min-height: 84vh;
+      display: grid;
+      grid-template-columns: 280px 1fr;
+      border-radius: 28px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      background: var(--panel);
+      backdrop-filter: blur(18px);
+      box-shadow: var(--shadow);
+    }
+
+    .sidebar {
+      padding: 24px 20px;
+      border-right: 1px solid var(--border);
+      background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01));
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    .brand-tag {
+      display: inline-flex;
+      width: fit-content;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: rgba(20, 184, 166, 0.12);
+      color: #8ff3e8;
+      font-size: 0.76rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+    }
+
+    .sidebar h1 {
+      margin: 0;
+      font-size: 1.8rem;
+      line-height: 1.1;
+    }
+
+    .sidebar p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+
+    .meta-card {
+      padding: 16px;
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      background: var(--surface);
+    }
+
+    .meta-card strong {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 0.92rem;
+    }
+
+    .main {
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      min-width: 0;
+    }
+
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      padding: 20px 24px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .assistant-profile {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .avatar {
+      width: 42px;
+      height: 42px;
+      border-radius: 14px;
+      display: grid;
+      place-items: center;
+      font-size: 1rem;
+      font-weight: 700;
+      color: white;
+      flex: 0 0 auto;
+    }
+
+    .avatar.assistant-avatar {
+      background: linear-gradient(135deg, #14b8a6, #0f766e);
+    }
+
+    .avatar.user-avatar {
+      background: linear-gradient(135deg, #2563eb, #1d4ed8);
+    }
+
+    .title-block strong {
+      display: block;
+      font-size: 1rem;
+    }
+
+    .title-block span {
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    .status-pill {
+      padding: 8px 12px;
+      border-radius: 999px;
+      border: 1px solid rgba(20, 184, 166, 0.22);
+      background: rgba(20, 184, 166, 0.08);
+      color: #95f7ee;
+      font-size: 0.85rem;
+    }
+
+    .chat {
+      overflow-y: auto;
+      padding: 28px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 22px;
+    }
+
+    .message-row {
+      display: flex;
+      gap: 14px;
+      align-items: flex-end;
+      animation: rise 180ms ease-out;
+    }
+
+    .message-row.user-row {
+      flex-direction: row-reverse;
+    }
+
+    .message-stack {
+      max-width: min(78%, 760px);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .message-meta {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--muted);
+      font-size: 0.82rem;
+      padding: 0 6px;
+    }
+
+    .user-row .message-meta {
+      justify-content: flex-end;
+    }
+
+    .bubble {
+      padding: 14px 16px;
+      border-radius: 20px;
+      line-height: 1.6;
+      white-space: pre-wrap;
+      word-break: break-word;
+      border: 1px solid transparent;
+    }
+
+    .assistant-row .bubble {
+      background: var(--assistant-bubble);
+      border-color: rgba(255, 255, 255, 0.06);
+      border-top-left-radius: 8px;
+    }
+
+    .user-row .bubble {
+      color: white;
+      background: var(--user-bubble);
+      border-top-right-radius: 8px;
+    }
+
+    .typing-bubble {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      width: fit-content;
+    }
+
+    .typing-dots {
+      display: inline-flex;
+      gap: 6px;
+    }
+
+    .typing-dots span {
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: rgba(229, 238, 252, 0.75);
+      animation: pulse 1.1s infinite ease-in-out;
+    }
+
+    .typing-dots span:nth-child(2) {
+      animation-delay: 0.15s;
+    }
+
+    .typing-dots span:nth-child(3) {
+      animation-delay: 0.3s;
+    }
+
+    .composer {
+      padding: 18px 20px 20px;
+      border-top: 1px solid var(--border);
+      background: rgba(15, 23, 42, 0.72);
+    }
+
+    .composer-shell {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 14px;
+      align-items: end;
+      padding: 12px;
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      background: var(--surface);
+    }
+
+    textarea {
+      width: 100%;
+      resize: none;
+      min-height: 58px;
+      max-height: 180px;
+      border: none;
+      padding: 14px 16px;
+      font: inherit;
+      color: var(--text);
+      background: transparent;
+      outline: none;
+    }
+
+    textarea::placeholder {
+      color: #70819b;
+    }
+
+    button {
+      border: none;
+      min-width: 118px;
+      height: 52px;
+      padding: 0 20px;
+      border-radius: 18px;
+      font: inherit;
+      font-weight: 700;
+      color: white;
+      background: linear-gradient(135deg, #14b8a6, #2563eb);
+      cursor: pointer;
+      transition: transform 140ms ease, opacity 140ms ease, box-shadow 140ms ease;
+      box-shadow: 0 12px 24px rgba(37, 99, 235, 0.2);
+    }
+
+    button:hover {
+      transform: translateY(-1px);
+    }
+
+    button:disabled {
+      opacity: 0.6;
+      cursor: wait;
+      transform: none;
+      box-shadow: none;
+    }
+
+    .hint {
+      padding: 8px 4px 0;
+      color: var(--muted);
+      font-size: 0.8rem;
+    }
+
+    @keyframes rise {
+      from {
+        opacity: 0;
+        transform: translateY(8px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @keyframes pulse {
+      0%, 80%, 100% {
+        opacity: 0.3;
+        transform: translateY(0);
+      }
+      40% {
+        opacity: 1;
+        transform: translateY(-3px);
+      }
+    }
+
+    @media (max-width: 920px) {
+      .shell {
+        grid-template-columns: 1fr;
+      }
+
+      .sidebar {
+        display: none;
+      }
+    }
+
+    @media (max-width: 720px) {
+      body {
+        padding: 0;
+      }
+
+      .shell {
+        min-height: 100vh;
+        border-radius: 0;
+      }
+
+      .topbar {
+        padding: 16px;
+      }
+
+      .chat {
+        padding: 20px 16px;
+      }
+
+      .message-stack {
+        max-width: 90%;
+      }
+
+      .composer {
+        padding: 14px;
+      }
+
+      .composer-shell {
+        grid-template-columns: 1fr;
+      }
+
+      button {
+        width: 100%;
+      }
+
+      .status-pill {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <aside class="sidebar">
+      <span class="brand-tag">Webhook Chat</span>
+      <div>
+        <h1>Assistant Console</h1>
+        <p>A polished local chat surface for your n8n-powered assistant.</p>
+      </div>
+      <div class="meta-card">
+        <strong>Connection</strong>
+        <p>Make sure your n8n workflow is listening before sending a message.</p>
+      </div>
+      <div class="meta-card">
+        <strong>Tips</strong>
+        <p>Press Enter to send. Use Shift+Enter for a new line in the composer.</p>
+      </div>
+    </aside>
+
+    <section class="main">
+      <header class="topbar">
+        <div class="assistant-profile">
+          <div class="avatar assistant-avatar">AI</div>
+          <div class="title-block">
+            <strong>n8n Assistant</strong>
+            <span id="connection-label">Ready to chat</span>
+          </div>
+        </div>
+        <div class="status-pill">Live webhook relay</div>
+      </header>
+
+      <section id="chat" class="chat">
+      </section>
+
+      <section class="composer">
+        <form id="chat-form">
+          <div class="composer-shell">
+            <textarea id="message-input" placeholder="Message your assistant..." required></textarea>
+            <button id="send-button" type="submit">Send</button>
+          </div>
+          <div class="hint">Responses come from your n8n webhook.</div>
+        </form>
+      </section>
+    </section>
+  </main>
+
+  <template id="message-template">
+    <article class="message-row">
+      <div class="avatar"></div>
+      <div class="message-stack">
+        <div class="message-meta">
+          <span class="message-author"></span>
+          <span class="message-time"></span>
+        </div>
+        <div class="bubble"></div>
+      </div>
+    </article>
+  </template>
+
+  <script>
+    const chat = document.getElementById("chat");
+    const form = document.getElementById("chat-form");
+    const input = document.getElementById("message-input");
+    const sendButton = document.getElementById("send-button");
+    const template = document.getElementById("message-template");
+    const connectionLabel = document.getElementById("connection-label");
+
+    const formatTime = () => {
+      return new Date().toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit"
+      });
+    };
+
+    const scrollToBottom = () => {
+      chat.scrollTop = chat.scrollHeight;
+    };
+
+    const addMessage = (text, role) => {
+      const fragment = template.content.cloneNode(true);
+      const row = fragment.querySelector(".message-row");
+      const avatar = fragment.querySelector(".avatar");
+      const author = fragment.querySelector(".message-author");
+      const time = fragment.querySelector(".message-time");
+      const bubble = fragment.querySelector(".bubble");
+
+      row.classList.add(role === "user" ? "user-row" : "assistant-row");
+      avatar.classList.add(role === "user" ? "user-avatar" : "assistant-avatar");
+      avatar.textContent = role === "user" ? "YU" : "AI";
+      author.textContent = role === "user" ? "You" : "Assistant";
+      time.textContent = formatTime();
+      bubble.textContent = text;
+
+      chat.appendChild(fragment);
+      scrollToBottom();
+      return chat.lastElementChild;
+    };
+
+    const addTypingIndicator = () => {
+      const fragment = template.content.cloneNode(true);
+      const row = fragment.querySelector(".message-row");
+      const avatar = fragment.querySelector(".avatar");
+      const author = fragment.querySelector(".message-author");
+      const time = fragment.querySelector(".message-time");
+      const bubble = fragment.querySelector(".bubble");
+
+      row.classList.add("assistant-row");
+      avatar.classList.add("assistant-avatar");
+      avatar.textContent = "AI";
+      author.textContent = "Assistant";
+      time.textContent = "typing...";
+      bubble.classList.add("typing-bubble");
+      bubble.innerHTML = '<span>Thinking</span><span class="typing-dots"><span></span><span></span><span></span></span>';
+
+      chat.appendChild(fragment);
+      scrollToBottom();
+      return chat.lastElementChild;
+    };
+
+    input.addEventListener("input", () => {
+      input.style.height = "auto";
+      input.style.height = `${Math.min(input.scrollHeight, 180)}px`;
+    });
+
+    input.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" && !event.shiftKey) {
+        event.preventDefault();
+        form.requestSubmit();
+      }
+    });
+
+    addMessage("Hello! Send a message when your n8n workflow is listening.", "assistant");
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+
+      const message = input.value.trim();
+      if (!message) {
+        return;
+      }
+
+      addMessage(message, "user");
+      input.value = "";
+      input.style.height = "auto";
+      input.focus();
+
+      const typingIndicator = addTypingIndicator();
+      connectionLabel.textContent = "Generating response";
+      sendButton.disabled = true;
+
+      try {
+        const response = await fetch("/chat", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ message })
+        });
+
+        const payload = await response.json();
+        typingIndicator.remove();
+
+        if (!response.ok) {
+          addMessage(payload.error || "Something went wrong.", "assistant");
+          connectionLabel.textContent = "There was a delivery issue";
+          return;
+        }
+
+        addMessage(payload.reply || "The assistant returned an empty reply.", "assistant");
+        connectionLabel.textContent = "Ready to chat";
+      } catch (error) {
+        typingIndicator.remove();
+        addMessage(`Network error: ${error.message}`, "assistant");
+        connectionLabel.textContent = "Connection issue";
+      } finally {
+        sendButton.disabled = false;
+        input.focus();
+      }
+    });
+  </script>
+</body>
+</html>

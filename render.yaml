@@ -1,0 +1,7 @@
+services:
+  - type: web
+    name: ai-lead-generation-chat
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python vs_studio/chat_server.py
+    plan: free
